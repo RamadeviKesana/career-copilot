@@ -9,8 +9,7 @@ AI-powered job match analyzer that scores your resume against job descriptions.
 - Tailored resume tip
 
 ## Demo
-![Career Copilot Demo](screenshots/Demo1.1.png.png)
-
+![Career Copilot Demo](screenshots/Demo1.1.png)
 ## Tech Stack
 - HTML, JavaScript
 - Groq AI (LLaMA 3.3 70B)
