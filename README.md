@@ -9,7 +9,7 @@ AI-powered job match analyzer that scores your resume against job descriptions.
 - Tailored resume tip
 
 ## Demo
-![Career Copilot Demo](screenshots/demo.png)
+![Career Copilot Demo](screenshots/Demo1.1.png.png)
 
 ## Tech Stack
 - HTML, JavaScript
