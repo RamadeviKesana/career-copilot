@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Career Copilot — Sponsor Company Jobs</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; min-height: 100vh; padding: 2rem 1rem; }
+  .app { max-width: 860px; margin: 0 auto; }
+  .header { margin-bottom: 1.5rem; }
+  .header h1 { font-size: 26px; font-weight: 600; color: #111; }
+  .header p { font-size: 15px; color: #666; margin-top: 6px; }
+  .search-bar { display: flex; gap: 10px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .search-bar input { flex: 1; min-width: 200px; border: 1px solid #e5e5e5; border-radius: 10px; padding: 13px 16px; font-size: 15px; outline: none; background: #fff; }
+  .search-bar input:focus { border-color: #aaa; }
+  .search-bar button { padding: 13px 28px; background: #111; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .search-bar button:disabled { opacity: 0.4; }
+  .status { font-size: 14px; color: #888; margin-bottom: 1rem; }
+  .job-card { background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; padding: 1.25rem; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+  .job-info h3 { font-size: 16px; font-weight: 600; color: #111; margin-bottom: 4px; }
+  .job-info .company { font-size: 14px; color: #555; font-weight: 600; }
+  .job-info .meta { font-size: 13px; color: #999; margin-top: 6px; }
+  .job-card a { padding: 10px 20px; background: #f0f0ee; color: #111; border-radius: 8px; font-size: 14px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+  .job-card a:hover { background: #e5e5e2; }
+  .badge { display: inline-block; background: #EDF2FE; color: #1F4BD8; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 6px; margin-left: 8px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>🏢 Sponsor Company Jobs</h1>
+    <p>Live jobs pulled directly from career systems of major tech companies with a history of visa sponsorship.</p>
+  </div>
+
+  <div class="search-bar">
+    <input type="text" id="searchInput" placeholder="Filter by title... e.g. software engineer, frontend, data" onkeydown="if(event.key==='Enter') searchJobs()">
+    <button onclick="searchJobs()" id="searchBtn">Search All Companies</button>
+  </div>
+
+  <div class="status" id="status"></div>
+  <div id="results"></div>
+</div>
+
+<script>
+// Companies with public Greenhouse boards + history of H1B sponsorship (public H1B filing data)
+const GREENHOUSE_COMPANIES = [
+  "stripe", "airbnb", "coinbase", "databricks", "dropbox",
+  "doordash", "instacart", "flexport", "brex", "samsara",
+  "gusto", "robinhood", "twilio", "datadog", "mongodb",
+  "cloudflare", "asana", "figma"
+];
+
+// Companies using Lever
+const LEVER_COMPANIES = ["palantir", "plaid"];
+
+async function fetchGreenhouse(company) {
+  try {
+    const res = await fetch(`https://boards-api.greenhouse.io/v1/boards/${company}/jobs`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.jobs || []).map(j => ({
+      title: j.title,
+      company: company.charAt(0).toUpperCase() + company.slice(1),
+      location: j.location ? j.location.name : 'Not specified',
+      url: j.absolute_url,
+      date: j.updated_at
+    }));
+  } catch { return []; }
+}
+
+async function fetchLever(company) {
+  try {
+    const res = await fetch(`https://api.lever.co/v0/postings/${company}?mode=json`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data || []).map(j => ({
+      title: j.text,
+      company: company.charAt(0).toUpperCase() + company.slice(1),
+      location: j.categories && j.categories.location ? j.categories.location : 'Not specified',
+      url: j.hostedUrl,
+      date: new Date(j.createdAt).toISOString()
+    }));
+  } catch { return []; }
+}
+
+function timeAgo(dateStr) {
+  const days = Math.floor((Date.now() - new Date(dateStr)) / 86400000);
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  return days + ' days ago';
+}
+
+async function searchJobs() {
+  const query = document.getElementById('searchInput').value.trim().toLowerCase();
+  const btn = document.getElementById('searchBtn');
+  const status = document.getElementById('status');
+  const results = document.getElementById('results');
+
+  btn.disabled = true;
+  btn.textContent = 'Searching...';
+  results.innerHTML = '';
+  status.textContent = `Pulling live jobs from ${GREENHOUSE_COMPANIES.length + LEVER_COMPANIES.length} company career systems...`;
+
+  const promises = [
+    ...GREENHOUSE_COMPANIES.map(fetchGreenhouse),
+    ...LEVER_COMPANIES.map(fetchLever)
+  ];
+  const allResults = await Promise.all(promises);
+  let jobs = allResults.flat();
+
+  // Filter by title keywords
+  if (query) {
+    const words = query.split(/\s+/);
+    jobs = jobs.filter(j => words.some(w => j.title.toLowerCase().includes(w)));
+  }
+
+  // USA locations only (rough filter)
+  jobs = jobs.filter(j => {
+    const loc = j.location.toLowerCase();
+    return !loc.includes('london') && !loc.includes('dublin') && !loc.includes('toronto') &&
+           !loc.includes('bangalore') && !loc.includes('singapore') && !loc.includes('berlin') &&
+           !loc.includes('amsterdam') && !loc.includes('paris') && !loc.includes('tokyo') &&
+           !loc.includes('sydney') && !loc.includes('india') && !loc.includes('canada') &&
+           !loc.includes('mexico') && !loc.includes('brazil') && !loc.includes('poland');
+  });
+
+  // Sort newest first
+  jobs.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  if (jobs.length === 0) {
+    status.textContent = 'No jobs matched. Try broader keywords like "engineer" or leave it empty to see everything.';
+  } else {
+    status.textContent = `Found ${jobs.length} live jobs — newest first, direct from company systems`;
+    jobs.slice(0, 100).forEach(job => {
+      const days = Math.floor((Date.now() - new Date(job.date)) / 86400000);
+      const card = document.createElement('div');
+      card.className = 'job-card';
+      card.innerHTML = `
+        <div class="job-info">
+          <h3>${job.title} ${days <= 3 ? '<span class="badge">NEW</span>' : ''}</h3>
+          <div class="company">${job.company}</div>
+          <div class="meta">📍 ${job.location} · 🕒 ${timeAgo(job.date)}</div>
+        </div>
+        <a href="${job.url}" target="_blank">Apply →</a>
+      `;
+      results.appendChild(card);
+    });
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Search All Companies';
+}
+</script>
+</body>
+</html>

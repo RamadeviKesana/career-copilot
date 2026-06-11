@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Career Copilot — Job Search</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; min-height: 100vh; padding: 2rem 1rem; }
+  .app { max-width: 860px; margin: 0 auto; }
+  .header { margin-bottom: 1.5rem; }
+  .header h1 { font-size: 26px; font-weight: 600; color: #111; }
+  .header p { font-size: 15px; color: #666; margin-top: 6px; }
+  .search-bar { display: flex; gap: 10px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .search-bar input, .search-bar select { border: 1px solid #e5e5e5; border-radius: 10px; padding: 13px 16px; font-size: 15px; outline: none; background: #fff; }
+  .search-bar input { flex: 1; min-width: 200px; }
+  .search-bar input:focus { border-color: #aaa; }
+  .search-bar button { padding: 13px 28px; background: #111; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .search-bar button:hover { opacity: 0.85; }
+  .search-bar button:disabled { opacity: 0.4; }
+  .status { font-size: 14px; color: #888; margin-bottom: 1rem; }
+  .job-card { background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; padding: 1.25rem; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+  .job-info h3 { font-size: 16px; font-weight: 600; color: #111; margin-bottom: 4px; }
+  .job-info .company { font-size: 14px; color: #555; }
+  .job-info .meta { font-size: 13px; color: #999; margin-top: 6px; }
+  .job-card a { padding: 10px 20px; background: #f0f0ee; color: #111; border-radius: 8px; font-size: 14px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+  .job-card a:hover { background: #e5e5e2; }
+  .badge-new { display: inline-block; background: #f0faf6; color: #0F6E56; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 6px; margin-left: 8px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>💼 Job Search</h1>
+    <p>Genuine US jobs from real companies — sorted by most recent.</p>
+  </div>
+
+  <div class="search-bar">
+    <input type="text" id="searchInput" placeholder="Job title... e.g. java developer" onkeydown="if(event.key==='Enter') searchJobs()">
+    <select id="categoryFilter">
+      <option value="">All categories</option>
+      <option value="Software Engineering">Software Engineering</option>
+      <option value="Data and Analytics">Data and Analytics</option>
+      <option value="Design and UX">Design and UX</option>
+      <option value="Product Management">Product Management</option>
+      <option value="IT">IT</option>
+    </select>
+    <input type="text" id="locationInput" placeholder="Location... e.g. New York, NY" style="max-width: 200px;">
+    <button onclick="searchJobs()" id="searchBtn">Search</button>
+  </div>
+
+  <div class="status" id="status"></div>
+  <div id="results"></div>
+</div>
+
+<script>
+function timeAgo(dateStr) {
+  const days = Math.floor((Date.now() - new Date(dateStr)) / 86400000);
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  return days + ' days ago';
+}
+
+async function searchJobs() {
+  const query = document.getElementById('searchInput').value.trim().toLowerCase();
+  const category = document.getElementById('categoryFilter').value;
+  const location = document.getElementById('locationInput').value.trim();
+
+  const btn = document.getElementById('searchBtn');
+  const status = document.getElementById('status');
+  const results = document.getElementById('results');
+
+  btn.disabled = true;
+  btn.textContent = 'Searching...';
+  status.textContent = 'Searching genuine US jobs...';
+  results.innerHTML = '';
+
+  try {
+    let allJobs = [];
+    // Fetch 3 pages for more results
+    for (let page = 1; page <= 3; page++) {
+      let url = `https://www.themuse.com/api/public/jobs?page=${page}`;
+      if (category) url += `&category=${encodeURIComponent(category)}`;
+      if (location) url += `&location=${encodeURIComponent(location)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      allJobs = allJobs.concat(data.results || []);
+    }
+
+    // Filter by search keywords in job title
+    if (query) {
+      const words = query.split(/\s+/);
+      allJobs = allJobs.filter(job =>
+        words.some(w => job.name.toLowerCase().includes(w))
+      );
+    }
+
+    // Sort by most recent first
+    allJobs.sort((a, b) => new Date(b.publication_date) - new Date(a.publication_date));
+
+    if (allJobs.length === 0) {
+      status.textContent = 'No jobs found. Try different keywords or remove filters.';
+    } else {
+      status.textContent = `Found ${allJobs.length} jobs — most recent first`;
+      allJobs.forEach(job => {
+        const days = Math.floor((Date.now() - new Date(job.publication_date)) / 86400000);
+        const card = document.createElement('div');
+        card.className = 'job-card';
+        card.innerHTML = `
+          <div class="job-info">
+            <h3>${job.name} ${days <= 3 ? '<span class="badge-new">NEW</span>' : ''}</h3>
+            <div class="company">${job.company.name}</div>
+            <div class="meta">📍 ${job.locations.map(l => l.name).join(' · ') || 'Not specified'} &nbsp;·&nbsp; 🕒 ${timeAgo(job.publication_date)}</div>
+          </div>
+          <a href="${job.refs.landing_page}" target="_blank">Apply →</a>
+        `;
+        results.appendChild(card);
+      });
+    }
+  } catch(err) {
+    status.textContent = 'Something went wrong. Try again.';
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Search';
+}
+</script>
+</body>
+</html>
